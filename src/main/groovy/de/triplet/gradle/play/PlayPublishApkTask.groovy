@@ -18,12 +18,22 @@ class PlayPublishApkTask extends PlayPublishTask {
     publishApks() {
         super.publish()
 
+
+        List<Integer> versionCodes = new ArrayList<Integer>()
+
         variant.outputs
-                .findAll { variantOutput -> variantOutput instanceof ApkVariantOutput }
-                .each { variantOutput -> publishApk(new FileContent(AndroidPublisherHelper.MIME_TYPE_APK, variantOutput.outputFile))}
+            .findAll { variantOutput -> variantOutput instanceof ApkVariantOutput }
+            .each { variantOutput -> versionCodes.add(publishApk(new FileContent(AndroidPublisherHelper.MIME_TYPE_APK, variantOutput.outputFile)).getVersionCode())}
+
+        Track track = new Track().setVersionCodes(versionCodes)
+        edits.tracks()
+                .update(variant.applicationId, editId, extension.track, track)
+                .execute()
+
+        edits.commit(variant.applicationId, editId).execute()
     }
 
-    def publishApk(apkFile) {
+    def Apk publishApk(apkFile) {
 
         Apk apk = edits.apks()
                 .upload(variant.applicationId, editId, apkFile)
@@ -58,10 +68,9 @@ class PlayPublishApkTask extends PlayPublishTask {
                             .execute()
                 }
             }
-
         }
 
-        edits.commit(variant.applicationId, editId).execute()
+        return apk
     }
 
 }
