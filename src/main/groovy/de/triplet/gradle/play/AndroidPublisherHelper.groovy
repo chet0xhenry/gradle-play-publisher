@@ -23,6 +23,8 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.AndroidPublisherScopes;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpRequest;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,8 +58,18 @@ public class AndroidPublisherHelper {
 
     /** Global instance of the HTTP transport. */
     private static HttpTransport HTTP_TRANSPORT;
+    private static HttpRequestInitializer setHttpTimeout(final HttpRequestInitializer requestInitializer) {
+        return new HttpRequestInitializer() {
+          @Override
+          public void initialize(HttpRequest httpRequest) throws IOException {
+            requestInitializer.initialize(httpRequest);
+            httpRequest.setConnectTimeout(0);  // 3 minutes connect timeout
+            httpRequest.setReadTimeout(0);  // 3 minutes read timeout
+          }
+        };
+    }
 
-    private static Credential authorizeWithServiceAccount(PlayPublisherPluginExtension extension)
+    private static HttpRequestInitializer authorizeWithServiceAccount(PlayPublisherPluginExtension extension)
             throws GeneralSecurityException, IOException {
         if (extension.serviceAccountEmail && extension.pk12File) {
             return authorizeWithServiceAccount(extension.serviceAccountEmail, extension.pk12File);
@@ -79,15 +91,15 @@ public class AndroidPublisherHelper {
                 .setServiceAccountScopes(Collections.singleton(AndroidPublisherScopes.ANDROIDPUBLISHER))
                 .setServiceAccountPrivateKeyFromP12File(pk12File)
                 .build();
-        return credential;
+        return setHttpTimeout(credential);
     }
 
-    private static Credential authorizeWithServiceAccount(File jsonFile) throws IOException {
+    private static HttpRequestInitializer authorizeWithServiceAccount(File jsonFile) throws IOException {
         Path path = Paths.get(jsonFile.absolutePath);
         InputStream serviceAccountStream = new ByteArrayInputStream(Files.readAllBytes(path));
         GoogleCredential credential = GoogleCredential
                 .fromStream(serviceAccountStream, HTTP_TRANSPORT, JSON_FACTORY);
-        return credential.createScoped(Collections.singleton(AndroidPublisherScopes.ANDROIDPUBLISHER));
+        return setHttpTimeout(credential.createScoped(Collections.singleton(AndroidPublisherScopes.ANDROIDPUBLISHER)));
     }
 
     /**
@@ -104,10 +116,9 @@ public class AndroidPublisherHelper {
 
         // Authorization.
         newTrustedTransport();
-        Credential credential = authorizeWithServiceAccount(extension);
 
         // Set up and return API client.
-        return new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+        return new AndroidPublisher.Builder(HTTP_TRANSPORT, JSON_FACTORY, authorizeWithServiceAccount(extension))
                 .setApplicationName(APPLICATION_NAME)
                 .build();
     }
@@ -118,5 +129,4 @@ public class AndroidPublisherHelper {
             HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
         }
     }
-
 }

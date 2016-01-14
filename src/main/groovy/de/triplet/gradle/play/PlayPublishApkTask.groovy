@@ -18,7 +18,6 @@ class PlayPublishApkTask extends PlayPublishTask {
     publishApks() {
         super.publish()
 
-
         List<Integer> versionCodes = new ArrayList<Integer>()
 
         variant.outputs
